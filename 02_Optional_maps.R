@@ -43,8 +43,8 @@ map_text <- unlist(strsplit(map_text,','))
 
 #-> Load in results of spatial analysis
 clps <- vect(paste0('./',run_name_file,'/',run_name_file,'_Planned_lines_points.shp'))
-clsum <- read.csv(paste0('./',run_name_file,'/',run_name_file,'_Planned_lines_stats.csv'),
-                  header=T)
+# clsum <- read.csv(paste0('./',run_name_file,'/',run_name_file,'_Planned_lines_stats.csv'),
+#                   header=T)
 
 #-> Reference layers
 fire <- vect('./Analysis_lines/perimeter.shp')
