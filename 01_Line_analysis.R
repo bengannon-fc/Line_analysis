@@ -12,7 +12,7 @@
 # - Rasters: including options for extraction function and several data transformations
 # - Parameters: sample point spacing, buffer distance for extraction, naming 
 # Constraints:
-# - Cannot accomodate multipart lines or polygons, converted to singlepart in script
+# - Cannot accommodate multipart lines or polygons, converted to singlepart in script
 ####################################################################################################
 #-> Set data paths
 setwd('C:/Users/UserName/WorkingDirectory')
