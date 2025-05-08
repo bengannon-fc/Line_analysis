@@ -74,7 +74,7 @@ for(i in 1:nrow(alines)){
 if(length(ALE.l) > 1){
 	alextents <- do.call('rbind',ALE.l)
 }else{
-	alextents <- ALE.l[[i]]
+	alextents <- ALE.l[[1]]
 }
 
 #-> Load in rasters; process if needed; store in list
