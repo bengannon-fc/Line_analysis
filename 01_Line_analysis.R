@@ -2,7 +2,7 @@
 #### Line analysis
 #### Author: Ben Gannon (benjamin.gannon@usda.gov)
 #### Date Created: 07/22/2021
-#### Last Modified: 05/30/2024
+#### Last Modified: 05/24/2025
 ####################################################################################################
 # Summary: ingests polylines or polygons, converts to polyline if necessary, generates sample points
 # at fixed distance intervals along the lines, extracts raster data for sample point buffers, and 
@@ -15,7 +15,7 @@
 # - Cannot accommodate multipart lines or polygons, converted to singlepart in script
 ####################################################################################################
 #-> Set data paths
-setwd('C:/Users/UserName/WorkingDirectory')
+setwd('C:/Users/UserName/WorkingDirectory') # User should adjust
 ####################################################################################################
 
 ############################################START MESSAGE###########################################
@@ -49,7 +49,7 @@ rasters <- rasters[rasters$Include==1,]
 alines <- data.frame(read_excel('01_Line_analysis_settings.xlsx',sheet='Lines'))
 alines <- alines[alines$Include==1,]
 
-#-> Set projection for perimeter measurements and exports
+#-> Set projection for perimeter measurements and exports to USGS Albers Equal Area Conic
 proj <- paste('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83',
               '+units=m +no_defs')
 
@@ -74,7 +74,7 @@ for(i in 1:nrow(alines)){
 if(length(ALE.l) > 1){
 	alextents <- do.call('rbind',ALE.l)
 }else{
-	alextents <- ALE.l[[1]]
+	alextents <- ALE.l[[i]]
 }
 
 #-> Load in rasters; process if needed; store in list
@@ -91,6 +91,10 @@ for(i in 1:nrow(rasters)){
 			from[k] <- as.numeric(csplit[1]); to[k] <- as.numeric(csplit[2])
 		}
 		R.l[[i]] <- classify(R.l[[i]],rcl=data.frame(from,to)) 
+	}
+	#-> Apply correction factor if specified 
+	if(!is.na(rasters$CorrFactor[i])){
+		R.l[[i]] <- R.l[[i]]*rasters$CorrFactor[i]
 	}
 	#-> Replace NA with zero
 	if(!is.na(rasters$NA2Zero[i])){
@@ -231,5 +235,4 @@ for(i in 1:nrow(alines)){
 
 ####################################################################################################
 cat('\nFinished at: ',as.character(Sys.time()),'\n\n',sep='')
-cat('Close command window to proceed!\n',sep='')
 ############################################END LOGGING#############################################
