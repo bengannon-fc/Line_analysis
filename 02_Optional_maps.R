@@ -2,14 +2,14 @@
 #### Line analysis maps and graphics
 #### Author: Ben Gannon (benjamin.gannon@usda.gov)
 #### Date Created: 09/26/2021
-#### Last Modified: 05/30/2024
+#### Last Modified: 05/24/2025
 ####################################################################################################
 # Makes simple maps for each line summary attribute. Run after completing the line analysis. Note
 # that title, legend, and arrow placement is sensitive to the R and terra package versions - some
 # adjustments may be needed.
 ####################################################################################################
 #-> Set data paths
-setwd('C:/Users/UserName/WorkingDirectory')
+setwd('C:/Users/UserName/WorkingDirectory') # User should adjust
 ####################################################################################################
 
 ############################################START MESSAGE###########################################
@@ -35,6 +35,8 @@ for(package in packages){
 #-> Load in settings
 rasters <- data.frame(read_excel('01_Line_analysis_settings.xlsx',sheet='Rasters'))
 rasters <- rasters[rasters$Include==1,]
+alines <- data.frame(read_excel('01_Line_analysis_settings.xlsx',sheet='Lines'))
+alines <- alines[alines$Map==1,]
 settings <- data.frame(read_excel('01_Line_analysis_settings.xlsx',sheet='Settings'))
 run_name <- settings[settings$Setting=='Run name','Value']
 run_name_file <- gsub(',','',gsub(' ','_',run_name)) # Clean up for file naming
@@ -42,12 +44,15 @@ map_text <- settings[settings$Setting=='Map text','Value']
 map_text <- unlist(strsplit(map_text,','))
 
 #-> Load in results of spatial analysis
-clps <- vect(paste0('./',run_name_file,'/',run_name_file,'_Planned_lines_points.shp'))
-# clsum <- read.csv(paste0('./',run_name_file,'/',run_name_file,'_Planned_lines_stats.csv'),
-#                   header=T)
+plps <- vect(paste0('./',run_name_file,'/',run_name_file,'_Planned_lines_points.shp'))
 
-#-> Reference layers
-fire <- vect('./Analysis_lines/perimeter.shp')
+#-> Load in reference layers if provided
+if('Perimeter' %in% alines$Map_name){ 
+	fire <- vect(alines[alines$Map_name=='Perimeter','Layer'])
+}
+if('Completed lines' %in% alines$Map_name){ 
+	cls <- vect(alines[alines$Map_name=='Completed lines','Layer'])
+}
 
 #-> Set global parameters
 bdist <- 800 # Buffer distance in meters around spatial data for mapping
@@ -73,13 +78,6 @@ makeSquare <- function(inPoly){
 	return(bb)
 }
 
-#-> Define color transparency function
-add.alpha <- function(COLORS,ALPHA){
-   RGB <- col2rgb(COLORS,alpha=T)
-   RGB[4,] <- round(RGB[4,]*ALPHA)
-   return(rgb(RGB[1,],RGB[2,],RGB[3,],RGB[4,],maxColorValue=255))
-}
-
 #############################################END SETUP##############################################
 
 ##########################################START ANALYSIS############################################
@@ -87,11 +85,16 @@ add.alpha <- function(COLORS,ALPHA){
 ###---> Organize data and download background layer
 
 #-> Project spatial data
-clps <- suppressWarnings(project(clps,proj))
-fire <- suppressWarnings(project(fire,proj))
+plps <- suppressWarnings(project(plps,proj))
+if(exists('fire')){
+	fire <- suppressWarnings(project(fire,proj))
+}
+if(exists('cls')){
+	cls <- suppressWarnings(project(cls,proj))
+}
 
 #-> Create bounding box
-mext <- as.polygons(ext(clps))
+mext <- as.polygons(ext(plps))
 crs(mext) <- proj
 bb <- makeSquare(buffer(mext,width=bdist))
 
@@ -101,8 +104,13 @@ bb <- makeSquare(buffer(mext,width=bdist))
 #base <- basemap_raster(ext=bb,map_service='esri',map_type='world_topo_map',verbose=F)
 base <- rast(basemap_stars(ext=bb,map_service='esri',map_type='world_topo_map',verbose=F))
 
-#-> Crop data to bounding box
-fire <- crop(buffer(fire,width=0),bb)
+#-> Crop reference layers to bounding box
+if(exists('fire')){
+	fire <- crop(buffer(fire,width=0),bb)
+}
+if(exists('cls')){
+	cls <- crop(cls,bb)
+}
 
 for(i in 1:nrow(rasters)){
 	
@@ -111,7 +119,7 @@ for(i in 1:nrow(rasters)){
 	labs <- unlist(strsplit(rasters$R_bin_labels[i],','))
 	colRP <- unlist(strsplit(rasters$R_ColorPalette[i],','))
 	cols <- colorRampPalette(colRP)(length(brks)-1)
-	clps$X <- data.frame(clps)[,rasters$Name[i]]
+	plps$X <- data.frame(plps)[,rasters$Name[i]]
 	
 	#-> Make map
 	tiff('map.tif',width=2000,height=2000,compression='lzw',type='windows',pointsize=44)
@@ -120,8 +128,13 @@ for(i in 1:nrow(rasters)){
 	mtext(run_name,cex=1.75,line=2,adj=0.05,font=2)
 	mtext(rasters$Map_name[i],cex=1.75,line=2,adj=0.95,font=2)
 	plot(bb,add=T) # Plot boundary
-	plot(fire,col=add.alpha('grey60',0.8),border=NA,add=T)
-	plot(clps,pch=20,col=cols[findInterval(clps$X,brks,all.inside=T)],cex=0.5,add=T)
+	if(exists('fire')){
+		plot(fire,col='grey60',alpha=0.8,border=NA,add=T)
+	}
+	if(exists('cls')){
+		plot(cls,col='black',lwd=2,add=T)
+	}
+	plot(plps,pch=20,col=cols[findInterval(plps$X,brks,all.inside=T)],cex=0.5,add=T)
 	#-> Scale bar
 	sbx <- xmin(bb) + 0.025*(xmax(bb)-xmin(bb))
 	sby <- ymin(bb) + 0.025*(ymax(bb)-ymin(bb))
@@ -135,8 +148,18 @@ for(i in 1:nrow(rasters)){
 	y2 <- ymin(bb) + 0.125*(ymax(bb)-ymin(bb))
 	arrows(sbx,y1,sbx,y2,length=0.25,lwd=8,xpd=T)
 	#-> Legend
-	legend('bottomright',c('Fire'),pch=c(20),fill=c('grey70'),border=c(NA),col=c(NA),lwd=c(NA),
-	       bg='white',xpd=T)
+	if(exists('fire') & !exists('cls')){
+		legend('bottomright',c('Fire'),pch=c(20),fill=c('grey70'),border=c(NA),col=c(NA),lwd=c(NA),
+			   bg='white',xpd=T)
+	}
+	if(!exists('fire') & exists('cls')){
+		legend('bottomright',c('Completed lines'),pch=c(NA),fill=c(NA),border=c(NA),col=c('black'),
+		       lwd=c(2),bg='white',xpd=T)
+	}
+	if(exists('fire') & exists('cls')){
+		legend('bottomright',c('Fire','Completed lines'),pch=c(20,NA),fill=c('grey70',NA),
+		       border=c(NA,NA),col=c(NA,'black'),lwd=c(NA,2),bg='white',xpd=T)
+	}
 	g <- dev.off()
 	
 	#-> Text block
@@ -153,7 +176,7 @@ for(i in 1:nrow(rasters)){
 	colnames(ot) <- c(rasters$Map_name[i])
 	tiff('table.tif',width=1000,height=440,compression='lzw',
 	     type='windows',pointsize=22)
-	t2 <- ttheme_default(base_size=40,core=list(bg_params=list(fill=add.alpha(cols,0.6))))
+	t2 <- ttheme_default(base_size=40,core=list(bg_params=list(fill=cols,alpha=0.6)))
 	grid.arrange(tableGrob(ot,rows=NULL,theme=t2))
 	g <- dev.off()
 	
@@ -161,7 +184,7 @@ for(i in 1:nrow(rasters)){
 	map_p <- image_read('map.tif')
 	text_p <- image_read('text.tif')
 	table_p <- image_read('table.tif')
-	RMA_p <- image_read('RMA_small.tif')
+	RMA_p <- image_read('SAB_logo.tif')
 	lp <- image_append(c(text_p,table_p,RMA_p),stack=F)
 	full <- image_append(c(map_p,lp),stack=T)
 	image_write(full,paste0('./',run_name_file,'/',run_name_file,'_Map_',rasters$Name[i],'.jpg'),
@@ -174,5 +197,4 @@ for(i in 1:nrow(rasters)){
 
 ####################################################################################################
 cat('\nFinished at: ',as.character(Sys.time()),'\n\n',sep='')
-cat('Close command window to proceed!\n',sep='')
 ############################################END LOGGING#############################################
