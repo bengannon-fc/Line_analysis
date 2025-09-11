@@ -2,7 +2,7 @@
 #### Line analysis
 #### Author: Ben Gannon (benjamin.gannon@usda.gov)
 #### Date Created: 07/22/2021
-#### Last Modified: 05/24/2025
+#### Last Modified: 09/11/2025
 ####################################################################################################
 # Summary: ingests polylines or polygons, converts to polyline if necessary, generates sample points
 # at fixed distance intervals along the lines, extracts raster data for sample point buffers, and 
@@ -57,13 +57,13 @@ proj <- paste('+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_
 AL.l <- list() # List to store analysis lines
 ALE.l <- list() # List to store buffered extents for clipping rasters
 for(i in 1:nrow(alines)){
-	al <- suppressWarnings(vect(alines$Layer[i]))
-	al <- disagg(al) # Multipart to singlepart
+	al <- suppressWarnings(vect(alines$Layer[i]))	
 	al <- project(al,proj)
 	if(alines$Type[i]=='polygon'){
 		al <- buffer(al,width=0) # Mitigate any geometry errors
 		al <- as.lines(al)
 	}
+	al <- disagg(al) # Multipart to singlepart
 	al$LID <- seq(1,nrow(al),1) # Add line ID field
 	al$Length_mi <- perim(al)*0.000621371 # Get length of each line
 	AL.l[[i]] <- al
@@ -236,3 +236,4 @@ for(i in 1:nrow(alines)){
 ####################################################################################################
 cat('\nFinished at: ',as.character(Sys.time()),'\n\n',sep='')
 ############################################END LOGGING#############################################
+
